@@ -10,7 +10,7 @@ import psycopg2
 load_dotenv()
 
 
-openai.api_key = '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'
+openai.api_key = os.getenv('OPENAPI_KEY')
 power_bi_app_id = os.getenv('POWER_BI_APP_ID')
 workspace_id = os.getenv('WORKSPACE_ID')
 dataset_id = os.getenv('DATASET_ID')
@@ -74,9 +74,10 @@ def test_prompt(table_name, df_string):
     response = openai.Completion.create(
         engine='text-davinci-003',  # Specify the appropriate engine
         prompt=f"""
-        The table {table_name} collects campaign performance across multiple platforms. The campaign_name column represents a campaign. Remember to filter out null values.
-        Write a Redshift-valid SQL query that determines which 10 campaigns have the highest impressions based on this csv. . : {df_string}
-        
+        The table {table_name} collects campaign performance across multiple platforms. 
+        The campaign_name column represents a campaign.
+        Ignoring null and 0 sum campaigns, write a Redshift-valid SQL query that determines 
+        which 10 campaigns have the highest clickthrough rate based on this csv: {df_string}
         """,
         max_tokens=400  # Adjust bas
     )
@@ -85,8 +86,8 @@ def test_prompt(table_name, df_string):
     response = response.replace(';','')
     return response
 
-
-table_name = 'dbt_dportuondo_final.open_ai_citrus_ad_template'
+table_name = 'public.daily_campaigns_fact'
+new_table = 'dbt_dportuondo_final.open_ai_citrus_ad_template'
 redshift_conn = create_conn()
 
 df_string = get_table_sample(redshift_conn, table_name)
@@ -96,9 +97,9 @@ openai_reponse = test_prompt(table_name, df_string)
 
 cur = redshift_conn.cursor()
 
-cur.execute(f'DROP TABLE IF EXISTS {table_name};')
+cur.execute(f'DROP TABLE IF EXISTS {new_table};')
 
-print(f'CREATE TABLE {table_name} AS ({openai_reponse});')
-cur.execute(f'CREATE TABLE {table_name} AS ({openai_reponse});')
+print(f'CREATE TABLE {new_table} AS ({openai_reponse});')
+cur.execute(f'CREATE TABLE {new_table} AS ({openai_reponse});')
 
 redshift_conn.commit()
